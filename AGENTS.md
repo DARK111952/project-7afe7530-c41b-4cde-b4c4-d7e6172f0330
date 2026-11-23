@@ -28,3 +28,9 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+## Project rules
+
+- Transactions are stored in browser localStorage via `src/lib/finance-store.ts` (useSyncExternalStore); keep all reads/writes there so a future move to a backend touches one module.
+- Money is stored as integer kopiykas and all totals/chart math lives as pure functions in `src/lib/finance.ts` (covered by `finance.test.ts`) — avoids float rounding and keeps rules testable.
+- The app is dark-only: dark tokens live in `:root` of `src/styles.css`; there is no light theme or toggle.
