@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  categoryOptions,
   expensesByCategory,
   filterByPeriod,
+  filterTransactions,
   parseAmount,
   summarize,
   transactionInputSchema,
@@ -59,5 +61,59 @@ describe("finance rules", () => {
     const base = { amount: "100", date: "2026-11-23", description: "" };
     expect(transactionInputSchema.safeParse({ ...base, type: "income", category: "food" }).success).toBe(false);
     expect(transactionInputSchema.safeParse({ ...base, type: "expense", category: "food" }).success).toBe(true);
+  });
+
+  const list = [
+    tx({ type: "expense", category: "food", description: "Обід у їдальні" }),
+    tx({ type: "expense", category: "transport", description: "Проїзний" }),
+    tx({ type: "income", category: "scholarship", description: "Стипендія" }),
+  ];
+  const all = { type: "all" as const, category: "all", query: "" };
+
+  it("type filter keeps only incomes or only expenses", () => {
+    expect(filterTransactions(list, { ...all, type: "income" }).map((t) => t.type)).toEqual(["income"]);
+    expect(filterTransactions(list, { ...all, type: "expense" })).toHaveLength(2);
+    expect(filterTransactions(list, all)).toHaveLength(3);
+  });
+
+  it("category filter keeps only that category", () => {
+    expect(filterTransactions(list, { ...all, category: "food" }).map((t) => t.description)).toEqual([
+      "Обід у їдальні",
+    ]);
+    expect(filterTransactions(list, { ...all, category: "other-expense" })).toHaveLength(0);
+  });
+
+  it("search matches the description, case and spaces ignored", () => {
+    expect(filterTransactions(list, { ...all, query: " ОБІД " }).map((t) => t.description)).toEqual([
+      "Обід у їдальні",
+    ]);
+    expect(filterTransactions(list, { ...all, query: "смачно" })).toHaveLength(0);
+  });
+
+  it("filters combine: expenses in food whose description matches", () => {
+    expect(filterTransactions(list, { type: "expense", category: "food", query: "їдал" })).toHaveLength(1);
+    expect(filterTransactions(list, { type: "income", category: "food", query: "" })).toHaveLength(0);
+  });
+
+  it("category choices follow the chosen type", () => {
+    expect(categoryOptions("income").map((c) => c.id)).toContain("scholarship");
+    expect(categoryOptions("income").map((c) => c.id)).not.toContain("food");
+    expect(categoryOptions("expense").map((c) => c.id)).toContain("food");
+    expect(categoryOptions("all").map((c) => c.id)).toEqual([
+      "food",
+      "transport",
+      "housing",
+      "study",
+      "fun",
+      "health",
+      "clothes",
+      "mobile",
+      "other-expense",
+      "scholarship",
+      "job",
+      "parents",
+      "gift",
+      "other-income",
+    ]);
   });
 });

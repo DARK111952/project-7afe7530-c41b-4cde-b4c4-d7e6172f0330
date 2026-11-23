@@ -2,14 +2,41 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { uk } from "date-fns/locale";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, X } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionRow } from "@/components/finance/TransactionRow";
 import { deleteTransaction, restoreTransaction, useTransactions } from "@/lib/finance-store";
-import { formatMoney, getCategory, sortByDateDesc, summarize, type Transaction } from "@/lib/finance";
+import {
+  categoryOptions,
+  filterTransactions,
+  formatMoney,
+  formatSigned,
+  getCategory,
+  sortByDateDesc,
+  summarize,
+  type Transaction,
+  type TypeFilter,
+} from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/transactions")({
@@ -26,8 +53,7 @@ export const Route = createFileRoute("/transactions")({
   component: TransactionsPage,
 });
 
-type Filter = "all" | "income" | "expense";
-const FILTERS: { id: Filter; label: string }[] = [
+const FILTERS: { id: TypeFilter; label: string }[] = [
   { id: "all", label: "Усі" },
   { id: "income", label: "Доходи" },
   { id: "expense", label: "Витрати" },
@@ -35,19 +61,15 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 function TransactionsPage() {
   const { transactions, ready } = useTransactions();
-  const [filter, setFilter] = useState<Filter>("all");
+  const [type, setType] = useState<TypeFilter>("all");
+  const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
+  const [pending, setPending] = useState<Transaction | null>(null);
 
-  const visible = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return sortByDateDesc(transactions).filter(
-      (t) =>
-        (filter === "all" || t.type === filter) &&
-        (!q ||
-          t.description.toLowerCase().includes(q) ||
-          getCategory(t.category).label.toLowerCase().includes(q)),
-    );
-  }, [transactions, filter, query]);
+  const visible = useMemo(
+    () => sortByDateDesc(filterTransactions(transactions, { type, category, query })),
+    [transactions, type, category, query],
+  );
 
   const totals = useMemo(() => summarize(visible), [visible]);
   const groups = useMemo(() => {
@@ -56,10 +78,26 @@ function TransactionsPage() {
     return [...map.entries()];
   }, [visible]);
 
-  const onDelete = (t: Transaction) => {
-    deleteTransaction(t.id);
+  const filtersActive = type !== "all" || category !== "all" || query.trim() !== "";
+
+  const resetFilters = () => {
+    setType("all");
+    setCategory("all");
+    setQuery("");
+  };
+
+  const pickType = (next: TypeFilter) => {
+    setType(next);
+    setCategory("all");
+  };
+
+  const confirmDelete = () => {
+    if (!pending) return;
+    const removed = pending;
+    setPending(null);
+    deleteTransaction(removed.id);
     toast("Транзакцію видалено", {
-      action: { label: "Повернути", onClick: () => restoreTransaction(t) },
+      action: { label: "Повернути", onClick: () => restoreTransaction(removed) },
     });
   };
 
@@ -90,30 +128,61 @@ function TransactionsPage() {
         />
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="flex rounded-full bg-muted p-1 text-sm">
           {FILTERS.map((f) => (
             <button
               key={f.id}
               type="button"
-              onClick={() => setFilter(f.id)}
+              onClick={() => pickType(f.id)}
+              aria-pressed={type === f.id}
               className={cn(
                 "flex-1 rounded-full px-4 py-1.5 font-medium text-muted-foreground transition-colors sm:flex-none",
-                filter === f.id && "bg-background text-foreground",
+                type === f.id && "bg-background text-foreground",
               )}
             >
               {f.label}
             </button>
           ))}
         </div>
-        <div className="relative sm:ml-auto sm:w-72">
+
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger
+            aria-label="Категорія"
+            className="h-10 w-full rounded-full sm:w-56 lg:ml-auto lg:w-48"
+          >
+            <SlidersHorizontal className="size-4 shrink-0 text-muted-foreground" />
+            <SelectValue placeholder="Усі категорії" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Усі категорії</SelectItem>
+            {categoryOptions(type).map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <div className="relative sm:w-72 lg:w-64">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Пошук за описом чи категорією"
-            className="h-10 rounded-full pl-9"
+            placeholder="Пошук за описом"
+            aria-label="Пошук за описом"
+            className="h-10 rounded-full pl-9 pr-9"
           />
+          {query !== "" && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              aria-label="Очистити пошук"
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -125,9 +194,18 @@ function TransactionsPage() {
             ))}
           </div>
         ) : groups.length === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            {transactions.length === 0 ? "Транзакцій ще немає" : "Нічого не знайдено"}
-          </p>
+          <div className="space-y-4 py-16 text-center">
+            <p className="text-sm text-muted-foreground">
+              {transactions.length === 0
+                ? "Транзакцій ще немає"
+                : "Нічого не знайдено за цими фільтрами"}
+            </p>
+            {filtersActive && transactions.length > 0 && (
+              <Button variant="outline" onClick={resetFilters} className="rounded-full">
+                Скинути фільтри
+              </Button>
+            )}
+          </div>
         ) : (
           groups.map(([date, items]) => (
             <div key={date} className="py-2">
@@ -136,13 +214,45 @@ function TransactionsPage() {
               </p>
               <ul>
                 {items.map((t) => (
-                  <TransactionRow key={t.id} transaction={t} onDelete={onDelete} showDate={false} />
+                  <TransactionRow
+                    key={t.id}
+                    transaction={t}
+                    onDelete={setPending}
+                    showDate={false}
+                  />
                 ))}
               </ul>
             </div>
           ))
         )}
       </section>
+
+      <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Видалити транзакцію?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pending && (
+                <>
+                  «{pending.description || getCategory(pending.category).label}» ·{" "}
+                  {formatSigned(pending)} ·{" "}
+                  {format(parseISO(pending.date), "d MMMM yyyy", { locale: uk })}. Цю дію можна
+                  скасувати відразу після видалення.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Скасувати</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Видалити
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

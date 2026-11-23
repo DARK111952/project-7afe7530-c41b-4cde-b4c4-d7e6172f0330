@@ -139,6 +139,34 @@ export function sortByDateDesc(transactions: Transaction[]): Transaction[] {
   );
 }
 
+export type TypeFilter = "all" | TransactionType;
+
+export interface TransactionFilter {
+  /** "all" keeps both incomes and expenses. */
+  type: TypeFilter;
+  /** "all" keeps every category, otherwise a category id. */
+  category: string;
+  /** Free text matched against the transaction description. */
+  query: string;
+}
+
+/** Categories offered by the filter for the chosen type. */
+export function categoryOptions(type: TypeFilter): CategoryDef[] {
+  if (type === "income") return INCOME_CATEGORIES;
+  if (type === "expense") return EXPENSE_CATEGORIES;
+  return [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES];
+}
+
+export function filterTransactions(transactions: Transaction[], f: TransactionFilter): Transaction[] {
+  const q = f.query.trim().toLowerCase();
+  return transactions.filter(
+    (t) =>
+      (f.type === "all" || t.type === f.type) &&
+      (f.category === "all" || t.category === f.category) &&
+      (!q || t.description.toLowerCase().includes(q)),
+  );
+}
+
 export const transactionInputSchema = z
   .object({
     type: z.enum(["income", "expense"]),
