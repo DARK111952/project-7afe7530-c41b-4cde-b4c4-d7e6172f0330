@@ -34,3 +34,4 @@ use the editor.
 - Transactions are stored in browser localStorage via `src/lib/finance-store.ts` (useSyncExternalStore); keep all reads/writes there so a future move to a backend touches one module.
 - Money is stored as integer kopiykas and all totals/chart math lives as pure functions in `src/lib/finance.ts` (covered by `finance.test.ts`) — avoids float rounding and keeps rules testable.
 - The app is dark-only: dark tokens live in `:root` of `src/styles.css`; there is no light theme or toggle.
+- Navigation is the shadcn Sidebar (`src/components/finance/AppSidebar.tsx`, collapsible icon mode) mounted in `__root.tsx`; the trigger lives in the top bar so it stays visible.
