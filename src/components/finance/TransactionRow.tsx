@@ -1,16 +1,18 @@
 import { format, parseISO } from "date-fns";
 import { uk } from "date-fns/locale";
-import { ArrowDownLeft, ArrowUpRight, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatSigned, getCategory, type Transaction } from "@/lib/finance";
 
 export function TransactionRow({
   transaction,
   onDelete,
+  onEdit,
   showDate = true,
 }: {
   transaction: Transaction;
   onDelete?: (t: Transaction) => void;
+  onEdit?: (t: Transaction) => void;
   showDate?: boolean;
 }) {
   const cat = getCategory(transaction.category);
@@ -41,6 +43,16 @@ export function TransactionRow({
       <span className={cn("num text-sm font-bold", isIncome ? "text-income" : "text-foreground")}>
         {formatSigned(transaction)}
       </span>
+      {onEdit && (
+        <button
+          type="button"
+          onClick={() => onEdit(transaction)}
+          aria-label="Редагувати транзакцію"
+          className="rounded-md p-2 text-muted-foreground opacity-60 transition hover:bg-accent hover:text-foreground group-hover:opacity-100"
+        >
+          <Pencil className="size-4" />
+        </button>
+      )}
       {onDelete && (
         <button
           type="button"

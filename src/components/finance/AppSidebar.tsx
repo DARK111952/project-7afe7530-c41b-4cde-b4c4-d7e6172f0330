@@ -1,5 +1,7 @@
-import { Link, useRouterState } from "@tanstack/react-router";
-import { LayoutDashboard, ListOrdered, Plus, Wallet } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { LayoutDashboard, ListOrdered, LogOut, Plus, Wallet } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -20,9 +22,19 @@ const items = [
   { title: "Транзакції", url: "/transactions", icon: ListOrdered },
 ] as const;
 
-export function AppSidebar() {
+export function AppSidebar({ email }: { email: string }) {
   const path = useRouterState({ select: (r) => r.location.pathname });
   const { setOpenMobile } = useSidebar();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
+  const signOut = async () => {
+    setOpenMobile(false);
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    await supabase.auth.signOut();
+    void navigate({ to: "/login", replace: true });
+  };
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
@@ -59,6 +71,17 @@ export function AppSidebar() {
                 <Plus />
                 <span>Додати транзакцію</span>
               </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <p className="truncate px-2 pt-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden" title={email}>
+              {email}
+            </p>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton tooltip="Вийти" onClick={() => void signOut()}>
+              <LogOut />
+              <span>Вийти</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

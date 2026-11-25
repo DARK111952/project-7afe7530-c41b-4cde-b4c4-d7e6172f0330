@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExpenseChart } from "@/components/finance/ExpenseChart";
 import { TransactionRow } from "@/components/finance/TransactionRow";
-import { useTransactions } from "@/lib/finance-store";
+import { transactionsQuery, useTransactions } from "@/lib/finance-store";
 import {
   expensesByCategory,
   filterByPeriod,
@@ -16,7 +16,7 @@ import {
 } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Огляд — Трекер особистих фінансів" },
@@ -27,6 +27,7 @@ export const Route = createFileRoute("/")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  loader: ({ context }) => context.queryClient.ensureQueryData(transactionsQuery),
   component: Dashboard,
 });
 

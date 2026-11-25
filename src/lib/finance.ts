@@ -186,34 +186,7 @@ export const transactionInputSchema = z
 
 export type TransactionInput = z.input<typeof transactionInputSchema>;
 
-/** Sample data shown on first visit so the dashboard isn't empty. */
-export function createDemoTransactions(now: Date): Transaction[] {
-  const day = (offset: number) => {
-    const d = new Date(now);
-    d.setDate(d.getDate() - offset);
-    return toDateKey(d);
-  };
-  const rows: [TransactionType, number, string, number, string][] = [
-    ["income", 2000, "scholarship", 1, "Стипендія за місяць"],
-    ["expense", 185, "food", 0, "Обід у їдальні"],
-    ["expense", 240, "transport", 1, "Проїзний на тиждень"],
-    ["income", 3500, "job", 3, "Підробіток бариста"],
-    ["expense", 420, "study", 4, "Зошити та ручки"],
-    ["expense", 350, "fun", 5, "Кіно з друзями"],
-    ["expense", 610, "food", 6, "Продукти на тиждень"],
-    ["expense", 150, "mobile", 8, "Поповнення мобільного"],
-    ["income", 1500, "parents", 10, "Допомога від батьків"],
-    ["expense", 1200, "housing", 12, "Гуртожиток"],
-    ["expense", 280, "health", 14, "Аптека"],
-    ["expense", 95, "food", 15, "Кава"],
-  ];
-  return rows.map(([type, uah, category, offset, description], i) => ({
-    id: `demo-${i}`,
-    type,
-    amount: uah * 100,
-    category,
-    date: day(offset),
-    description,
-    createdAt: now.getTime() - i,
-  }));
+/** Kopiykas back to the text the amount field accepts, e.g. 12050 -> "120.50". */
+export function amountToInput(cents: number): string {
+  return cents % 100 === 0 ? String(cents / 100) : (cents / 100).toFixed(2);
 }

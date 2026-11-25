@@ -25,7 +25,15 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TransactionRow } from "@/components/finance/TransactionRow";
-import { deleteTransaction, restoreTransaction, useTransactions } from "@/lib/finance-store";
+import {
+  transactionsQuery,
+  useDeleteTransaction,
+  useRestoreTransaction,
+  useTransactions,
+  useUpdateTransaction,
+} from "@/lib/finance-store";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { TransactionForm } from "@/components/finance/TransactionForm";
 import {
   categoryOptions,
   filterTransactions,
@@ -39,7 +47,7 @@ import {
 } from "@/lib/finance";
 import { cn } from "@/lib/utils";
 
-export const Route = createFileRoute("/transactions")({
+export const Route = createFileRoute("/_authenticated/transactions")({
   head: () => ({
     meta: [
       { title: "Транзакції — Трекер особистих фінансів" },
@@ -50,6 +58,7 @@ export const Route = createFileRoute("/transactions")({
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  loader: ({ context }) => context.queryClient.ensureQueryData(transactionsQuery),
   component: TransactionsPage,
 });
 
@@ -65,6 +74,10 @@ function TransactionsPage() {
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
   const [pending, setPending] = useState<Transaction | null>(null);
+  const [editing, setEditing] = useState<Transaction | null>(null);
+  const remove = useDeleteTransaction();
+  const restore = useRestoreTransaction();
+  const update = useUpdateTransaction();
 
   const visible = useMemo(
     () => sortByDateDesc(filterTransactions(transactions, { type, category, query })),
@@ -91,13 +104,24 @@ function TransactionsPage() {
     setCategory("all");
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pending) return;
     const removed = pending;
     setPending(null);
-    deleteTransaction(removed.id);
+    try {
+      await remove.mutateAsync(removed.id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Не вдалося видалити");
+      return;
+    }
     toast("Транзакцію видалено", {
-      action: { label: "Повернути", onClick: () => restoreTransaction(removed) },
+      action: {
+        label: "Повернути",
+        onClick: () =>
+          restore.mutate(removed, {
+            onError: (e) => toast.error(e.message),
+          }),
+      },
     });
   };
 
@@ -218,6 +242,7 @@ function TransactionsPage() {
                     key={t.id}
                     transaction={t}
                     onDelete={setPending}
+                    onEdit={setEditing}
                     showDate={false}
                   />
                 ))}
@@ -226,6 +251,33 @@ function TransactionsPage() {
           ))
         )}
       </section>
+
+      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Редагувати транзакцію</DialogTitle>
+            <DialogDescription>Змініть потрібні поля й збережіть.</DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <TransactionForm
+              key={editing.id}
+              initial={editing}
+              submitLabel="Зберегти зміни"
+              onCancel={() => setEditing(null)}
+              onSubmit={async (d) => {
+                try {
+                  await update.mutateAsync({ id: editing.id, ...d });
+                } catch (e) {
+                  toast.error(e instanceof Error ? e.message : "Не вдалося зберегти");
+                  return;
+                }
+                setEditing(null);
+                toast.success("Зміни збережено");
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
         <AlertDialogContent>
@@ -245,7 +297,7 @@ function TransactionsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Скасувати</AlertDialogCancel>
             <AlertDialogAction
-              onClick={confirmDelete}
+              onClick={() => void confirmDelete()}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Видалити

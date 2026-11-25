@@ -11,8 +11,7 @@ import {
 import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
-import { AppSidebar, TopBar } from "../components/finance/AppSidebar";
-import { SidebarProvider } from "../components/ui/sidebar";
+import { supabase } from "../integrations/supabase/client";
 import { Toaster } from "../components/ui/sonner";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -128,19 +127,25 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
+
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        queryClient.clear();
+        void router.invalidate();
+      } else if (event === "SIGNED_IN" || event === "USER_UPDATED") {
+        void router.invalidate();
+        void queryClient.invalidateQueries();
+      }
+    });
+    return () => data.subscription.unsubscribe();
+  }, [queryClient, router]);
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <SidebarProvider>
-        <div className="flex min-h-screen w-full">
-          <AppSidebar />
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar />
-            <Outlet />
-          </div>
-        </div>
-      </SidebarProvider>
+      <Outlet />
       <Toaster position="bottom-center" theme="dark" />
     </QueryClientProvider>
   );
